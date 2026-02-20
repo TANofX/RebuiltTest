@@ -20,7 +20,7 @@ public class RobotContainer {
   }
 
   private void configureBindings() {
-    driverController.LB().onTrue(new RotationTest(new TurretMotorTest("Test Turret", 37, 0), driverController));
+    driverController.LB().onTrue(new RotationTest(new TurretMotorTest("Test Turret", 50, 0), driverController));
     driverController.A().onTrue(new RPMTest(new ShooterMotorTest("Top Left", 30)));
     driverController.B().onTrue(new RPMTest(new ShooterMotorTest("Bottom Left", 31)));
     driverController.X().onTrue(new RPMTest(new ShooterMotorTest("Top Right",32)));
