@@ -7,14 +7,11 @@ package frc.robot;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.lib.input.controllers.XboxControllerWrapper;
-import frc.robot.command.RPMTest;
-import frc.robot.command.RotationTest;
-// Uncomment the following imports to enable live-tuning wiring
-// import frc.robot.subsystem.TunableShooterSubsystem;
-// import frc.robot.LiveTuneShuffleboard;
-// import frc.robot.command.LiveTuneShooterCommand;
-import frc.robot.subsystem.ShooterMotorTest;
-import frc.robot.subsystem.TurretMotorTest;
+import frc.robot.command.JoystickDirectDrive;
+import frc.robot.command.JoystickRPMDrive;
+import frc.robot.command.LiveTuneShooterCommand;
+import frc.robot.command.SetRPM;
+import frc.robot.subsystem.TunableShooterSubsystem;
 
 public class RobotContainer {
   private final XboxControllerWrapper driverController = new XboxControllerWrapper(0);
@@ -24,19 +21,24 @@ public class RobotContainer {
   }
 
   private void configureBindings() {
-    driverController.LB().onTrue(new RotationTest(new TurretMotorTest("Test Turret", 50, 0), driverController));
-    driverController.A().onTrue(new RPMTest(new ShooterMotorTest("Top Left", 30)));
-    driverController.B().onTrue(new RPMTest(new ShooterMotorTest("Bottom Left", 31)));
-    driverController.X().onTrue(new RPMTest(new ShooterMotorTest("Top Right",32)));
-    driverController.Y().onTrue(new RPMTest(new ShooterMotorTest("Bottom Right", 33)));
+    // driverController.LB().whileTrue(new RotationTest(new TurretMotorTest("Test Turret", 50, 0), driverController));
+    // driverController.A().whileTrue(new RPMTest(new ShooterMotorTest("Top Left", 30)));
+    // driverController.B().whileTrue(new RPMTest(new ShooterMotorTest("Bottom Left", 31)));
+    // driverController.X().whileTrue(new RPMTest(new ShooterMotorTest("Top Right",32)));
+    // driverController.Y().whileTrue(new RPMTest(new ShooterMotorTest("Bottom Right", 33)));
 
     // Example wiring for the live-tune subsystem (commented out by default).
     // To enable live tuning, uncomment the lines below and adjust motor IDs.
-    // TunableShooterSubsystem tunable = new TunableShooterSubsystem(30, 31);
-    // LiveTuneShuffleboard.setup(tunable); // creates NT keys and simple displays
-    // LiveTuneShooterCommand live = new LiveTuneShooterCommand(tunable);
+    TunableShooterSubsystem tunable = new TunableShooterSubsystem(30, 32);
+    TunableShooterSubsystem bottomTunable = new TunableShooterSubsystem(31, 33);
+    LiveTuneShuffleboard.setup(tunable); // creates NT keys and simple displays
+    LiveTuneShooterCommand live = new LiveTuneShooterCommand(tunable);
     // To start immediately (for testing) call: live.schedule();
     // Or bind to a controller button in this method when you're ready.
+    driverController.A().toggleOnTrue(new JoystickRPMDrive(bottomTunable, driverController));
+    driverController.B().toggleOnTrue(new JoystickDirectDrive(bottomTunable, driverController));
+    driverController.X().toggleOnTrue(Commands.parallel(new JoystickRPMDrive(bottomTunable, driverController), new JoystickRPMDrive(tunable, driverController)));
+    driverController.Y().toggleOnTrue(new SetRPM(tunable, bottomTunable));
   }
 
   public Command getAutonomousCommand() {

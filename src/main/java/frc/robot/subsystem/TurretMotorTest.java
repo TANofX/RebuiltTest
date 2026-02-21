@@ -32,11 +32,12 @@ public class TurretMotorTest extends SubsystemBase {
   public TurretMotorTest(String turretName, int motorID, int dioChannel) {
     name = turretName;
     turretMotor = new SparkFlex(motorID, SparkFlex.MotorType.kBrushless);
-
-    config.smartCurrentLimit(40, 20);
+  
+    config.smartCurrentLimit(80, 40);
     config.idleMode(SparkFlexConfig.IdleMode.kBrake);
+   
     config.voltageCompensation(11.0);
-    config.voltageCompensation(10.0);
+   
 
     turretMotor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     turretEncoder = turretMotor.getEncoder();

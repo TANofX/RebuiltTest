@@ -5,6 +5,7 @@
 package frc.robot.command;
 
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystem.ShooterMotorTest;
 
@@ -34,22 +35,24 @@ public class RPMTest extends Command {
   // Called every time the scheduler runs while the command is scheduled.
   @Override
   public void execute() {
-    if (increaseTimer.advanceIfElapsed(0.1)) {
+    if (increaseTimer.advanceIfElapsed(2)) {
       if (isIncreasing) {
-        currentOutput += 0.01;
+        currentOutput += 0.1;
         if (currentOutput >= 1.0) {
           currentOutput = 1.0;
           isIncreasing = false;
         }
       } else {
-        currentOutput -= 0.01;
+        currentOutput -= 0.1;
         if (currentOutput <= -1.0) {
           currentOutput = -1.0;
           isIncreasing = true;
         }
-      }
-      shooterMotorTest.setMotorOutput(currentOutput);
     }
+     SmartDashboard.putNumber("Test Output", currentOutput);
+     
+    }
+     shooterMotorTest.setMotorOutput(currentOutput);
   }
 
   // Called once the command ends or is interrupted.

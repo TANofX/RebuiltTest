@@ -33,7 +33,7 @@ public class ShooterMotorTest extends SubsystemBase {
     this.name = motorName;
     this.shooterEncoder = shooterMotor.getEncoder();
 
-    config.smartCurrentLimit(40, 30);
+    config.smartCurrentLimit(100, 100);
     config.idleMode(IdleMode.kCoast);
     config.voltageCompensation(11.0);
 

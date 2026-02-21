@@ -3,6 +3,7 @@ package frc.robot.command;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystem.TunableShooterSubsystem;
 
@@ -19,61 +20,41 @@ import frc.robot.subsystem.TunableShooterSubsystem;
  */
 public class LiveTuneShooterCommand extends Command {
   private final TunableShooterSubsystem shooter;
-  private final NetworkTable table;
 
-  private final NetworkTableEntry targetEntry;
-  private final NetworkTableEntry pEntry;
-  private final NetworkTableEntry iEntry;
-  private final NetworkTableEntry dEntry;
-  private final NetworkTableEntry kfEntry;
-  private final NetworkTableEntry ksEntry;
-  private final NetworkTableEntry kvEntry;
-  private final NetworkTableEntry kaEntry;
-  private final NetworkTableEntry enabledEntry;
 
   public LiveTuneShooterCommand(TunableShooterSubsystem shooter) {
     this.shooter = shooter;
     addRequirements(shooter);
-
-    table = NetworkTableInstance.getDefault().getTable("Shooter").getSubTable("TunableShooter").getSubTable("LiveTune");
-
-    targetEntry = table.getEntry("TargetRPM");
-    pEntry = table.getEntry("kP");
-    iEntry = table.getEntry("kI");
-    dEntry = table.getEntry("kD");
-    kfEntry = table.getEntry("kF");
-    ksEntry = table.getEntry("kS");
-    kvEntry = table.getEntry("kV");
-    kaEntry = table.getEntry("kA");
-    enabledEntry = table.getEntry("Enabled");
   }
 
   @Override
   public void initialize() {
     // Populate NT defaults from current subsystem state so UI shows live values
-    targetEntry.setDouble(shooter.getTargetRPM());
-    pEntry.setDouble(shooter.kP());
-    iEntry.setDouble(shooter.kI());
-    dEntry.setDouble(shooter.kD());
-    kfEntry.setDouble(shooter.kF);
-    ksEntry.setDouble(shooter.getKS());
-    kvEntry.setDouble(shooter.getKV());
-    kaEntry.setDouble(shooter.getKA());
-    enabledEntry.setBoolean(false);
+    SmartDashboard.putNumber("Shooter/LiveTune/TargetRPM", shooter.getTargetRPM());
+    SmartDashboard.putNumber("Shooter/LiveTune/kP",shooter.kP());
+    SmartDashboard.putNumber("Shooter/LiveTune/kI",shooter.kI());
+    SmartDashboard.putNumber("Shooter/LiveTune/kD",shooter.kD());
+    SmartDashboard.putNumber("Shooter/LiveTune/kF",shooter.kF);
+    SmartDashboard.putNumber("Shooter/LiveTune/kS",shooter.getKS());
+    SmartDashboard.putNumber("Shooter/LiveTune/kV",shooter.getKV());
+    SmartDashboard.putNumber("Shooter/LiveTune/kA",shooter.getKA());
+    SmartDashboard.putBoolean("Shooter/LiveTune/Enabled",false);
   }
 
   @Override
   public void execute() {
     // Read values (use current subsystem values as fallbacks)
-    double target = targetEntry.getDouble(shooter.getTargetRPM());
-    double p = pEntry.getDouble(shooter.kP());
-    double i = iEntry.getDouble(shooter.kI());
-    double d = dEntry.getDouble(shooter.kD());
-    double kf = kfEntry.getDouble(shooter.kF);
-    double ks = ksEntry.getDouble(shooter.getKS());
-    double kv = kvEntry.getDouble(shooter.getKV());
-    double ka = kaEntry.getDouble(shooter.getKA());
-    boolean en = enabledEntry.getBoolean(false);
+    double target = SmartDashboard.getNumber("Shooter/LiveTune/TargetRPM", shooter.getTargetRPM());
+    double p = SmartDashboard.getNumber("Shooter/LiveTune/kP",shooter.kP());
+    double i = SmartDashboard.getNumber("Shooter/LiveTune/kI",shooter.kI());
+
+
+    double d = SmartDashboard.getNumber("Shooter/LiveTune/kD",shooter.kD());
+    double kf = SmartDashboard.getNumber("Shooter/LiveTune/kF",shooter.kF);
+    double ks = SmartDashboard.getNumber("Shooter/LiveTune/kS",shooter.getKS());
+    double kv = SmartDashboard.getNumber("Shooter/LiveTune/kV",shooter.getKV());
+    double ka = SmartDashboard.getNumber("Shooter/LiveTune/kA",shooter.getKA());
+    boolean en =  SmartDashboard.getBoolean("Shooter/LiveTune/Enabled",false);
 
     // Apply tuning values
     shooter.setTargetRPM(target);
@@ -86,6 +67,17 @@ public class LiveTuneShooterCommand extends Command {
     } else {
       shooter.disable();
     }
+
+    // Populate NT defaults from current subsystem state so UI shows live values
+    SmartDashboard.putNumber("Shooter/LiveTune/TargetRPM", shooter.getTargetRPM());
+    SmartDashboard.putNumber("Shooter/LiveTune/kP",shooter.kP());
+    SmartDashboard.putNumber("Shooter/LiveTune/kI",shooter.kI());
+    SmartDashboard.putNumber("Shooter/LiveTune/kD",shooter.kD());
+    SmartDashboard.putNumber("Shooter/LiveTune/kF",shooter.kF);
+    SmartDashboard.putNumber("Shooter/LiveTune/kS",shooter.getKS());
+    SmartDashboard.putNumber("Shooter/LiveTune/kV",shooter.getKV());
+    SmartDashboard.putNumber("Shooter/LiveTune/kA",shooter.getKA());
+    SmartDashboard.putBoolean("Shooter/LiveTune/Enabled",false);
   }
 
   @Override

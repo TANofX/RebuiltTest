@@ -35,7 +35,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
 
   // PID + feedforward terms (exposed for tuning)
   private final PIDController pid = new PIDController(0.0, 0.0, 0.0);
-  private double kS = 0.0;
+  private double kS = 0.01;
   private double kV = 0.0;
   private double kA = 0.0;
   // extra kF feedforward (applied either via internal controller's FF or as an arbFF)
@@ -56,6 +56,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
   private final DoublePublisher rpmPublisher;
   private final DoublePublisher targetPublisher;
   private final DoublePublisher busVoltagePublisher;
+  private final DoublePublisher currentPublisher;
 
   /**
    * Create a tunable shooter with a leader and an inverted follower.
@@ -70,9 +71,9 @@ public class TunableShooterSubsystem extends SubsystemBase {
     encoder = leader.getEncoder();
 
     // reasonable defaults copied from other motor tests in the project
-    config.smartCurrentLimit(40, 30);
+    config.smartCurrentLimit(80, 50);
     config.idleMode(IdleMode.kCoast);
-    config.voltageCompensation(11.0);
+    config.voltageCompensation(10.0);
 
     leader.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     // Apply the same base settings to the follower first
@@ -99,7 +100,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
     rpmPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/RPM").publish();
     targetPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Target RPM").publish();
     busVoltagePublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Bus Voltage").publish();
-
+    currentPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Current").publish();
     lastTimestamp = Timer.getFPGATimestamp();
 
     // Try to get the SparkFlex internal closed-loop controller (preferred over software PID)
@@ -109,6 +110,9 @@ public class TunableShooterSubsystem extends SubsystemBase {
       // If the API isn't available for some reason, we'll stay with software PID
       closedLoopController = null;
     }
+
+    setFeedforward(0.01, 0.0022, 0.0038);
+    setPID(0.00008, 0.0, 0.000001);
   }
 
   /** Enable closed-loop control. */
@@ -141,6 +145,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
     // Also update the closed-loop configuration and persist it to the controller
     try {
       config.closedLoop.p(p).i(i).d(d);
+      config.closedLoopRampRate(0.1);
       leader.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     } catch (Exception ex) {
       // If the config API isn't available/throws, continue using the software PID only
@@ -177,6 +182,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
     double currentRPM = encoder.getVelocity();
     rpmPublisher.set(currentRPM);
     busVoltagePublisher.set(leader.getBusVoltage());
+    currentPublisher.set(leader.getOutputCurrent());
 
     double output = 0.0;
     if (enabled) {
@@ -243,7 +249,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
     appliedOutputPublisher.set(leader.getAppliedOutput());
   }
 
-  private void setDirectOutput(double output) {
+  public void setDirectOutput(double output) {
     if (hardwareFollowConfigured) {
         leader.set(output);
     } else {
