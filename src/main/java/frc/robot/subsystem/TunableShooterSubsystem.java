@@ -65,7 +65,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
    * @param followerId CAN ID of the follower SparkFlex (brushless) — this motor
    *                   will be driven with the inverted output of the leader
    */
-  public TunableShooterSubsystem(int leaderId, int followerId) {
+  public TunableShooterSubsystem(int leaderId, int followerId, double kV, double kA, double kS, double p, double i, double d, String name) {
     leader = new SparkFlex(leaderId, SparkFlex.MotorType.kBrushless);
     follower = new SparkFlex(followerId, SparkFlex.MotorType.kBrushless);
     encoder = leader.getEncoder();
@@ -110,9 +110,10 @@ public class TunableShooterSubsystem extends SubsystemBase {
       // If the API isn't available for some reason, we'll stay with software PID
       closedLoopController = null;
     }
+    
+    setFeedforward(kS, kV, kA);
+    setPID(p, i, d);
 
-    setFeedforward(0.01, 0.0022, 0.0038);
-    setPID(0.00008, 0.0, 0.000001);
   }
 
   /** Enable closed-loop control. */
