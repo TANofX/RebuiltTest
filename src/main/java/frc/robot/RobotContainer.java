@@ -29,14 +29,16 @@ public class RobotContainer {
 
     // Example wiring for the live-tune subsystem (commented out by default).
     // To enable live tuning, uncomment the lines below and adjust motor IDs.
-    TunableShooterSubsystem tunable = new TunableShooterSubsystem(30, 32, 0.0019764, 0.002, 0.0064, 0.00025, 0.00000012, 0.00004, "top");
-    TunableShooterSubsystem bottomTunable = new TunableShooterSubsystem(31, 33, 0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "bottom");
+    TunableShooterSubsystem tunable = new TunableShooterSubsystem(30, 32, 0.0019764, 0.002, 0.0064, 0.00025, 0.00000012, 0.00004, "top", false);
+    TunableShooterSubsystem bottomTunable = new TunableShooterSubsystem(31, 33, 0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "bottom", false);
+    TunableShooterSubsystem middleTunable = new TunableShooterSubsystem(34,  0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "middle", true);
+    TunableShooterSubsystem indexer = new TunableShooterSubsystem(40, 0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "indexer", true);
     // LiveTuneShuffleboard.setup(tunable); // creates NT keys and simple displays
     // To start immediately (for testing) call: live.schedule();
     // Or bind to a controller button in this method when you're ready.
-    driverController.A().toggleOnTrue(new JoystickRPMDrive(bottomTunable, driverController));
+    driverController.A().toggleOnTrue(new JoystickRPMDrive(indexer, "indexer/", driverController));
     driverController.B().toggleOnTrue(new JoystickDirectDrive(bottomTunable, driverController));
-    driverController.X().toggleOnTrue(Commands.parallel(new JoystickRPMDrive(bottomTunable, driverController), new JoystickRPMDrive(tunable, driverController)));
+    driverController.X().toggleOnTrue(Commands.parallel(new JoystickRPMDrive(bottomTunable, "bottom/", driverController), new JoystickRPMDrive(tunable, "top/", driverController), new JoystickRPMDrive(middleTunable, "middle/", driverController)));
     driverController.Y().toggleOnTrue(new SetRPM(tunable, bottomTunable));
   }
 

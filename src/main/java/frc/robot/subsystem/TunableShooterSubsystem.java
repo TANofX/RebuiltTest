@@ -29,7 +29,7 @@ import com.revrobotics.spark.SparkBase.ControlType;
 public class TunableShooterSubsystem extends SubsystemBase {
   private final String name = "TunableShooter";
   private final SparkFlex leader;
-  private final SparkFlex follower;
+  private SparkFlex follower;
   private final RelativeEncoder encoder;
   private final SparkFlexConfig config = new SparkFlexConfig();
 
@@ -65,7 +65,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
    * @param followerId CAN ID of the follower SparkFlex (brushless) — this motor
    *                   will be driven with the inverted output of the leader
    */
-  public TunableShooterSubsystem(int leaderId, int followerId, double kV, double kA, double kS, double p, double i, double d, String name) {
+  public TunableShooterSubsystem(int leaderId, int followerId, double kV, double kA, double kS, double p, double i, double d, String name, boolean inverted) {
     leader = new SparkFlex(leaderId, SparkFlex.MotorType.kBrushless);
     follower = new SparkFlex(followerId, SparkFlex.MotorType.kBrushless);
     encoder = leader.getEncoder();
@@ -74,6 +74,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
     config.smartCurrentLimit(80, 50);
     config.idleMode(IdleMode.kCoast);
     config.voltageCompensation(10.0);
+    config.inverted(inverted);
 
     leader.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     // Apply the same base settings to the follower first
@@ -114,6 +115,42 @@ public class TunableShooterSubsystem extends SubsystemBase {
     setFeedforward(kS, kV, kA);
     setPID(p, i, d);
 
+  }
+  public TunableShooterSubsystem(int leaderId, double kV, double kA, double kS, double p, double i, double d, String name, boolean inverted) {
+    leader = new SparkFlex(leaderId, SparkFlex.MotorType.kBrushless);
+    encoder = leader.getEncoder();
+
+    // reasonable defaults copied from other motor tests in the project
+    config.smartCurrentLimit(80, 50);
+    config.idleMode(IdleMode.kCoast);
+    config.voltageCompensation(10.0);
+    config.inverted(inverted);
+
+    leader.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    // Apply the same base settings to the follower first
+    
+    // Then configure the follower to hardware-follow the leader and persist that
+
+    // initial PID/FF values are zero; user can set them via setters
+    pid.setTolerance(50.0); // RPM tolerance (coarse)
+
+    appliedOutputPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Applied Output").publish();
+    rpmPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/RPM").publish();
+    targetPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Target RPM").publish();
+    busVoltagePublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Bus Voltage").publish();
+    currentPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Current").publish();
+    lastTimestamp = Timer.getFPGATimestamp();
+
+    // Try to get the SparkFlex internal closed-loop controller (preferred over software PID)
+    try {
+      closedLoopController = leader.getClosedLoopController();
+    } catch (Exception ex) {
+      // If the API isn't available for some reason, we'll stay with software PID
+      closedLoopController = null;
+    }
+    
+    setFeedforward(kS, kV, kA);
+    setPID(p, i, d);
   }
 
   /** Enable closed-loop control. */
@@ -255,7 +292,9 @@ public class TunableShooterSubsystem extends SubsystemBase {
         leader.set(output);
     } else {
         leader.set(output);
-        follower.set(-output);  
+        if (follower != null) { 
+        follower.set(-output);
+        }  
     }
   }
 

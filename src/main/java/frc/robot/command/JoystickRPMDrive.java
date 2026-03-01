@@ -14,14 +14,16 @@ import frc.robot.subsystem.TunableShooterSubsystem;
 public class JoystickRPMDrive extends Command {
   private XboxControllerWrapper controller;
   private TunableShooterSubsystem subsystem;
+  private String subName;
   private double targetRPM = 900;
   private Timer waitTime = new Timer();
 
   /** Creates a new JoystickDirectDrive. */
-  public JoystickRPMDrive(TunableShooterSubsystem shooter, XboxControllerWrapper wrapper) {
+  public JoystickRPMDrive(TunableShooterSubsystem shooter, String name, XboxControllerWrapper wrapper) {
     controller = wrapper;
     // Use addRequirements() here to declare subsystem dependencies.
     subsystem = shooter;
+    subName = name;
     addRequirements(subsystem);
   }
 
@@ -31,7 +33,7 @@ public class JoystickRPMDrive extends Command {
     subsystem.setDirectOutput(0);
     subsystem.setTargetRPM(targetRPM);
     subsystem.enable();
-    SmartDashboard.putNumber("RPMTurret/Target", targetRPM);
+    SmartDashboard.putNumber (subName + "RPMTurret/Target", targetRPM);
     waitTime.restart();
   }
 
@@ -42,11 +44,11 @@ public class JoystickRPMDrive extends Command {
     if (controller.DDown().getAsBoolean() && waitTime.advanceIfElapsed(2)) {
       targetRPM -= 100;
       subsystem.setTargetRPM(targetRPM);
-      SmartDashboard.putNumber("RPMTurret/Target", targetRPM);
+      SmartDashboard.putNumber(subName + "RPMTurret/Target", targetRPM);
     } else if (controller.DUp().getAsBoolean() && waitTime.advanceIfElapsed(2)) {
       targetRPM += 100;
       subsystem.setTargetRPM(targetRPM);
-      SmartDashboard.putNumber("RPMTurret/Target", targetRPM);
+      SmartDashboard.putNumber(subName +"RPMTurret/Target", targetRPM);
     }
   }
 

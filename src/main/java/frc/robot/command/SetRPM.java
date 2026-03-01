@@ -14,6 +14,7 @@ import frc.robot.subsystem.TunableShooterSubsystem;
 public class SetRPM extends Command {
   private TunableShooterSubsystem top;
   private TunableShooterSubsystem bottom;
+
   private double target;
   private NetworkTableEntry targetRPMEntry = NetworkTableInstance.getDefault().getTable("SetRPM").getEntry("Target");
   /** Creates a new SetRPM. */
