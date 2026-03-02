@@ -1,18 +1,37 @@
 package frc.robot.subsystem;
 
+import static edu.wpi.first.units.Units.Radians;
+import static edu.wpi.first.units.Units.RadiansPerSecond;
+import static edu.wpi.first.units.Units.Rotations;
+import static edu.wpi.first.units.Units.RotationsPerSecond;
+import static edu.wpi.first.units.Units.Volts;
+
 import com.revrobotics.PersistMode;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.ResetMode;
+import com.revrobotics.sim.SparkFlexSim;
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.config.SparkFlexConfig;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.networktables.DoublePublisher;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.units.measure.MutAngle;
+import edu.wpi.first.units.measure.MutAngularVelocity;
+import edu.wpi.first.units.measure.MutVoltage;
+import edu.wpi.first.units.measure.Voltage;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.simulation.FlywheelSim;
+import edu.wpi.first.wpilibj.simulation.RoboRioSim;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkBase.ControlType;
 
@@ -26,12 +45,14 @@ import com.revrobotics.spark.SparkBase.ControlType;
  *   implements the closed-loop in robot code so gains are easy to tune and
  *   observe. It mirrors the leader output to an inverted follower motor.
  */
-public class TunableShooterSubsystem extends SubsystemBase {
-  private final String name = "TunableShooter";
+public class TunableMotorSubsystem extends SubsystemBase {
+  private String name = "TunableShooter";
   private final SparkFlex leader;
   private SparkFlex follower;
   private final RelativeEncoder encoder;
   private final SparkFlexConfig config = new SparkFlexConfig();
+
+  private final SysIdRoutine sysIdRoutine;
 
   // PID + feedforward terms (exposed for tuning)
   private final PIDController pid = new PIDController(0.0, 0.0, 0.0);
@@ -50,6 +71,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
   private double lastTargetRPM = 0.0;
   private double lastTimestamp = 0.0;
   private boolean enabled = false;
+  private boolean invertFollower = false;
 
   // NetworkTables publishers for telemetry and tuning
   private final DoublePublisher appliedOutputPublisher;
@@ -58,6 +80,22 @@ public class TunableShooterSubsystem extends SubsystemBase {
   private final DoublePublisher busVoltagePublisher;
   private final DoublePublisher currentPublisher;
 
+  // Mutable holder for unit-safe voltage values, persisted to avoid reallocation.
+  private final MutVoltage m_appliedVoltage = Volts.mutable(0);
+  // Mutable holder for unit-safe linear distance values, persisted to avoid reallocation.
+  private final MutAngle m_angle = Radians.mutable(0);
+  // Mutable holder for unit-safe linear velocity values, persisted to avoid reallocation.
+  private final MutAngularVelocity m_velocity = RadiansPerSecond.mutable(0);
+  
+ private final FlywheelSim flywheelSim = new FlywheelSim(
+      LinearSystemId.identifyVelocitySystem(0.0005, 0.0001), // KV, KA constants
+      DCMotor.getNeoVortex(1), // 1 NEO Vortex motor
+      1.0                      // 1:1 Gearing
+  );
+
+  // Links the WPILib physics to the REV motor behavior
+  private final SparkFlexSim motorSim;
+
   /**
    * Create a tunable shooter with a leader and an inverted follower.
    *
@@ -65,18 +103,13 @@ public class TunableShooterSubsystem extends SubsystemBase {
    * @param followerId CAN ID of the follower SparkFlex (brushless) — this motor
    *                   will be driven with the inverted output of the leader
    */
-  public TunableShooterSubsystem(int leaderId, int followerId, double kV, double kA, double kS, double p, double i, double d, String name, boolean inverted) {
-    leader = new SparkFlex(leaderId, SparkFlex.MotorType.kBrushless);
+  public TunableMotorSubsystem(int leaderId, int followerId, double kV, double kA, double kS, double p, double i, double d, String name, boolean inverted, boolean invertedFollower) {
+    this(leaderId, kV, kA, kS, p, i, d, name, inverted); // call the simpler constructor to initialize leader and config
+
+    this.invertFollower = invertedFollower;
+
     follower = new SparkFlex(followerId, SparkFlex.MotorType.kBrushless);
-    encoder = leader.getEncoder();
-
-    // reasonable defaults copied from other motor tests in the project
-    config.smartCurrentLimit(80, 50);
-    config.idleMode(IdleMode.kCoast);
-    config.voltageCompensation(10.0);
-    config.inverted(inverted);
-
-    leader.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+ 
     // Apply the same base settings to the follower first
     follower.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
@@ -84,7 +117,7 @@ public class TunableShooterSubsystem extends SubsystemBase {
     try {
       SparkFlexConfig followerFollow = new SparkFlexConfig();
       // follow the leader and invert the output for the follower
-      followerFollow.follow(leader, true);
+      followerFollow.follow(leader, invertFollower);
       // Don't reset previously-applied safe parameters; only enable follower mode
       follower.configure(followerFollow, ResetMode.kNoResetSafeParameters, PersistMode.kPersistParameters);
       hardwareFollowConfigured = true;
@@ -93,30 +126,10 @@ public class TunableShooterSubsystem extends SubsystemBase {
       // we'll fall back to software mirroring (below in periodic()).
       hardwareFollowConfigured = false;
     }
-
-    // initial PID/FF values are zero; user can set them via setters
-    pid.setTolerance(50.0); // RPM tolerance (coarse)
-
-    appliedOutputPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Applied Output").publish();
-    rpmPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/RPM").publish();
-    targetPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Target RPM").publish();
-    busVoltagePublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Bus Voltage").publish();
-    currentPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Current").publish();
-    lastTimestamp = Timer.getFPGATimestamp();
-
-    // Try to get the SparkFlex internal closed-loop controller (preferred over software PID)
-    try {
-      closedLoopController = leader.getClosedLoopController();
-    } catch (Exception ex) {
-      // If the API isn't available for some reason, we'll stay with software PID
-      closedLoopController = null;
-    }
-    
-    setFeedforward(kS, kV, kA);
-    setPID(p, i, d);
-
   }
-  public TunableShooterSubsystem(int leaderId, double kV, double kA, double kS, double p, double i, double d, String name, boolean inverted) {
+
+  public TunableMotorSubsystem(int leaderId, double kV, double kA, double kS, double p, double i, double d, String name, boolean inverted) {
+    this.name = name;
     leader = new SparkFlex(leaderId, SparkFlex.MotorType.kBrushless);
     encoder = leader.getEncoder();
 
@@ -134,11 +147,11 @@ public class TunableShooterSubsystem extends SubsystemBase {
     // initial PID/FF values are zero; user can set them via setters
     pid.setTolerance(50.0); // RPM tolerance (coarse)
 
-    appliedOutputPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Applied Output").publish();
-    rpmPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/RPM").publish();
-    targetPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Target RPM").publish();
-    busVoltagePublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Bus Voltage").publish();
-    currentPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/Shooter/" + name + "/Current").publish();
+    appliedOutputPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/TunableSubsystems/" + name + "/Applied Output").publish();
+    rpmPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/TunableSubsystems/" + name + "/RPM").publish();
+    targetPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/TunableSubsystems/" + name + "/Target RPM").publish();
+    busVoltagePublisher = NetworkTableInstance.getDefault().getDoubleTopic("/TunableSubsystems/" + name + "/Bus Voltage").publish();
+    currentPublisher = NetworkTableInstance.getDefault().getDoubleTopic("/TunableSubsystems/" + name + "/Current").publish();
     lastTimestamp = Timer.getFPGATimestamp();
 
     // Try to get the SparkFlex internal closed-loop controller (preferred over software PID)
@@ -151,7 +164,29 @@ public class TunableShooterSubsystem extends SubsystemBase {
     
     setFeedforward(kS, kV, kA);
     setPID(p, i, d);
+
+    sysIdRoutine = new SysIdRoutine(
+      new SysIdRoutine.Config(),
+      new SysIdRoutine.Mechanism(
+        this::setVoltage,
+        log -> {
+                log.motor(name)
+                    .voltage(
+                        m_appliedVoltage.mut_replace(
+                            leader.get() * leader.getBusVoltage(), Volts))
+                    .angularPosition(m_angle.mut_replace(encoder.getPosition(), Rotations))
+                    .angularVelocity(
+                        m_velocity.mut_replace(encoder.getVelocity(), RotationsPerSecond));
+        },
+        this
+      ));
+
+    motorSim = new SparkFlexSim(leader, DCMotor.getNeoVortex(1));
   }
+
+  public String getName() {
+    return name;
+  } 
 
   /** Enable closed-loop control. */
   public void enable() {
@@ -161,11 +196,34 @@ public class TunableShooterSubsystem extends SubsystemBase {
     lastTimestamp = Timer.getFPGATimestamp();
   }
 
+  public void setVoltage(Voltage voltage) {
+    if (hardwareFollowConfigured) {
+      closedLoopController.setSetpoint(voltage.in(Volts), ControlType.kVoltage);
+    } else {
+      leader.setVoltage(voltage);
+      if (follower != null) {
+          if (invertFollower) {
+            follower.setVoltage(voltage.unaryMinus());
+          } else {
+          follower.setVoltage(voltage);
+        }
+      }
+    }
+  }
+
   /** Disable closed-loop control and stop motors. */
   public void disable() {
+    if (hardwareFollowConfigured) {
+      // If hardware follow is configured, we can just stop the leader and the follower will mirror it
+      leader.stopMotor();
+    } else {
+      // If not, we need to stop both motors explicitly
+      leader.stopMotor();
+      if (follower != null) {
+        follower.stopMotor();
+      }
+    }
     enabled = false;
-    leader.stopMotor();
-    follower.stopMotor();
   }
 
   public void setTargetRPM(double rpm) {
@@ -287,13 +345,35 @@ public class TunableShooterSubsystem extends SubsystemBase {
     appliedOutputPublisher.set(leader.getAppliedOutput());
   }
 
+   @Override
+  public void simulationPeriodic() {
+    // 3. Update Physics: Tell the physics sim what voltage is being applied
+    flywheelSim.setInput(motorSim.getAppliedOutput() * RoboRioSim.getVInVoltage());
+    
+    // 4. Advance Simulation: Move the simulation forward by 20ms
+    flywheelSim.update(0.020);
+
+    // 5. Sync REV Motor: Feed the resulting physics back into the motor's internal state
+    motorSim.iterate(
+        flywheelSim.getAngularVelocityRPM(), // Current velocity from physics
+        RoboRioSim.getVInVoltage(),            // Current battery voltage
+        0.020                                  // Timestep
+    );
+
+    RoboRioSim.setVInCurrent(flywheelSim.getCurrentDrawAmps());
+  }
+
   public void setDirectOutput(double output) {
     if (hardwareFollowConfigured) {
         leader.set(output);
     } else {
         leader.set(output);
         if (follower != null) { 
-        follower.set(-output);
+          if (invertFollower) {
+            follower.set(-output);
+          } else {
+            follower.set(output);
+          }
         }  
     }
   }
@@ -344,4 +424,23 @@ public class TunableShooterSubsystem extends SubsystemBase {
       return 0.0;
     }
   }
+
+  /**
+   * Returns a command that will execute a quasistatic test in the given direction.
+   *
+   * @param direction The direction (forward or reverse) to run the test in
+   */
+  public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
+    return sysIdRoutine.quasistatic(direction);
+  }
+
+  /**
+   * Returns a command that will execute a dynamic test in the given direction.
+   *
+   * @param direction The direction (forward or reverse) to run the test in
+   */
+  public Command sysIdDynamic(SysIdRoutine.Direction direction) {
+    return sysIdRoutine.dynamic(direction);
+  }
+
 }

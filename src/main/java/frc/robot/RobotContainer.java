@@ -4,45 +4,79 @@
 
 package frc.robot;
 
+import java.util.TreeMap;
+
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.lib.input.controllers.XboxControllerWrapper;
 import frc.robot.command.JoystickDirectDrive;
 import frc.robot.command.JoystickRPMDrive;
-import frc.robot.command.LiveTuneShooterCommand;
-import frc.robot.command.SetRPM;
-import frc.robot.subsystem.TunableShooterSubsystem;
+import frc.robot.subsystem.TunableMotorSubsystem;
 
 public class RobotContainer {
   private final XboxControllerWrapper driverController = new XboxControllerWrapper(0);
+  private final SendableChooser<Command> autoChooser = new SendableChooser<Command>();
+  private final SendableChooser<TunableMotorSubsystem> liveTuneChooser = new SendableChooser<TunableMotorSubsystem>();
+  private final TreeMap<String, TunableMotorSubsystem> tunableSubsystems = new TreeMap<>();
 
   public RobotContainer() {
+    tunableSubsystems.put("Top Tunable", new TunableMotorSubsystem(30, 32, 0.0019764, 0.002, 0.0064, 0.00025, 0.00000012, 0.00004, "top", false, true));
+    tunableSubsystems.put("Bottom Tunable", new TunableMotorSubsystem(31, 33, 0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "bottom", false, true));
+    tunableSubsystems.put("Middle Tunable", new TunableMotorSubsystem(34,0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "middle", true));
+    tunableSubsystems.put("Indexer Tunable", new TunableMotorSubsystem(40, 0.0021294, 0.0022, 0.0038, 0.0015, 1e-7, 4e-5, "indexer", true));  
+    tunableSubsystems.put("Intake Tunable", new TunableMotorSubsystem(51, 0.0021294, 0.0022, 0.0038, 0.0015, 1e-7, 4e-5, "intake", false));
+
     configureBindings();
   }
 
   private void configureBindings() {
-    // driverController.LB().whileTrue(new RotationTest(new TurretMotorTest("Test Turret", 50, 0), driverController));
-    // driverController.A().whileTrue(new RPMTest(new ShooterMotorTest("Top Left", 30)));
-    // driverController.B().whileTrue(new RPMTest(new ShooterMotorTest("Bottom Left", 31)));
-    // driverController.X().whileTrue(new RPMTest(new ShooterMotorTest("Top Right",32)));
-    // driverController.Y().whileTrue(new RPMTest(new ShooterMotorTest("Bottom Right", 33)));
+    int index = 0;
+    for (String key : tunableSubsystems.keySet()) {
+      TunableMotorSubsystem subsystem = tunableSubsystems.get(key);
+      if (index == 0) {
+        liveTuneChooser.setDefaultOption(key, subsystem);
+        autoChooser.setDefaultOption(key + " Quasistatic Forward", subsystem.sysIdQuasistatic(Direction.kForward));
+        autoChooser.addOption(key + " Quasistatic Reverse", subsystem.sysIdQuasistatic(Direction.kReverse));
+        autoChooser.addOption(key + " Dynamic Forward", subsystem.sysIdDynamic(Direction.kForward));
+        autoChooser.addOption(key + " Dynamic Reverse", subsystem.sysIdDynamic(Direction.kReverse));
+      } else {
+        liveTuneChooser.addOption(key, subsystem);
+        autoChooser.addOption(key + " Quasistatic Forward", subsystem.sysIdQuasistatic(Direction.kForward));
+        autoChooser.addOption(key + " Quasistatic Reverse", subsystem.sysIdQuasistatic(Direction.kReverse));
+        autoChooser.addOption(key + " Dynamic Forward", subsystem.sysIdDynamic(Direction.kForward));
+        autoChooser.addOption(key + " Dynamic Reverse", subsystem.sysIdDynamic(Direction.kReverse));
+      }
 
-    // Example wiring for the live-tune subsystem (commented out by default).
-    // To enable live tuning, uncomment the lines below and adjust motor IDs.
-    TunableShooterSubsystem tunable = new TunableShooterSubsystem(30, 32, 0.0019764, 0.002, 0.0064, 0.00025, 0.00000012, 0.00004, "top", false);
-    TunableShooterSubsystem bottomTunable = new TunableShooterSubsystem(31, 33, 0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "bottom", false);
-    TunableShooterSubsystem middleTunable = new TunableShooterSubsystem(34,  0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "middle", true);
-    TunableShooterSubsystem indexer = new TunableShooterSubsystem(40, 0.0021294, 0.0022, 0.0038, 0.00015, 0.00000012, 0.00004, "indexer", true);
-    // LiveTuneShuffleboard.setup(tunable); // creates NT keys and simple displays
-    // To start immediately (for testing) call: live.schedule();
-    // Or bind to a controller button in this method when you're ready.
-    driverController.A().toggleOnTrue(new JoystickRPMDrive(indexer, "indexer/", driverController));
-    driverController.B().toggleOnTrue(new JoystickDirectDrive(bottomTunable, driverController));
-    driverController.X().toggleOnTrue(Commands.parallel(new JoystickRPMDrive(bottomTunable, "bottom/", driverController), new JoystickRPMDrive(tunable, "top/", driverController), new JoystickRPMDrive(middleTunable, "middle/", driverController)));
-    driverController.Y().toggleOnTrue(new SetRPM(tunable, bottomTunable));
+      index++;
+    }
+
+    liveTuneChooser.onChange(this::configureTunableButtonBindings);
+
+    driverController.X().toggleOnTrue(Commands.parallel(
+      new JoystickRPMDrive(tunableSubsystems.get("Top Tunable"), driverController), 
+      new JoystickRPMDrive(tunableSubsystems.get("Bottom Tunable"), driverController), 
+      new JoystickRPMDrive(tunableSubsystems.get("Middle Tunable"), driverController))
+    );
+    driverController.Y().toggleOnTrue(
+      new JoystickDirectDrive(tunableSubsystems.get("Indexer Tunable"), () -> driverController.getLeftY())
+    );
+    driverController.RB().toggleOnTrue(
+      new JoystickDirectDrive(tunableSubsystems.get("Intake Tunable"), () -> driverController.getLeftX())
+    );
+
+    SmartDashboard.putData("Auto Mode", autoChooser);
+    SmartDashboard.putData("Live Tune Subsystem", liveTuneChooser);
   }
 
   public Command getAutonomousCommand() {
-    return Commands.print("No autonomous command configured");
+    return autoChooser.getSelected();
+  }
+
+  private void configureTunableButtonBindings(TunableMotorSubsystem subsystem) {
+    driverController.A().toggleOnTrue(new JoystickRPMDrive(subsystem, driverController));
+    driverController.B().toggleOnTrue(new JoystickDirectDrive(subsystem, () -> driverController.getLeftY()));
   }
 }

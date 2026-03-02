@@ -4,18 +4,21 @@
 
 package frc.robot.command;
 
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.lib.input.controllers.XboxControllerWrapper;
-import frc.robot.subsystem.TunableShooterSubsystem;
+import frc.robot.subsystem.TunableMotorSubsystem;
 
 /* You should consider using the more terse Command factories API instead https://docs.wpilib.org/en/stable/docs/software/commandbased/organizing-command-based.html#defining-commands */
 public class JoystickDirectDrive extends Command {
-  private XboxControllerWrapper controller;
-  private TunableShooterSubsystem subsystem;
+  private TunableMotorSubsystem subsystem;
+  private Supplier<Double> controller;
 
   /** Creates a new JoystickDirectDrive. */
-  public JoystickDirectDrive(TunableShooterSubsystem shooter, XboxControllerWrapper wrapper) {
-    controller = wrapper;
+  public JoystickDirectDrive(TunableMotorSubsystem shooter, Supplier<Double> joystickAxis) {
+    controller = joystickAxis;
     // Use addRequirements() here to declare subsystem dependencies.
     subsystem = shooter;
     addRequirements(subsystem);
@@ -30,7 +33,7 @@ public class JoystickDirectDrive extends Command {
   // Called every time the scheduler runs while the command is scheduled.
   @Override
   public void execute() {
-    subsystem.setDirectOutput(-1 * controller.getLeftY());
+    subsystem.setDirectOutput(controller.get().doubleValue());
   }
 
   // Called once the command ends or is interrupted.

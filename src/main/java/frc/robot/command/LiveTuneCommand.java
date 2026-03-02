@@ -5,7 +5,7 @@ import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
-import frc.robot.subsystem.TunableShooterSubsystem;
+import frc.robot.subsystem.TunableMotorSubsystem;
 
 /**
  * Command that reads tuning values from NetworkTables and applies them to
@@ -18,11 +18,11 @@ import frc.robot.subsystem.TunableShooterSubsystem;
  * - kP, kI, kD, kF, kS, kV, kA (doubles)
  * - Enabled (boolean) — when true the subsystem is enabled and will accept setpoints
  */
-public class LiveTuneShooterCommand extends Command {
-  private final TunableShooterSubsystem shooter;
+public class LiveTuneCommand extends Command {
+  private final TunableMotorSubsystem shooter;
 
 
-  public LiveTuneShooterCommand(TunableShooterSubsystem shooter) {
+  public LiveTuneCommand(TunableMotorSubsystem shooter) {
     this.shooter = shooter;
     addRequirements(shooter);
   }

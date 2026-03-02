@@ -8,17 +8,17 @@ import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
-import frc.robot.subsystem.TunableShooterSubsystem;
+import frc.robot.subsystem.TunableMotorSubsystem;
 
 /* You should consider using the more terse Command factories API instead https://docs.wpilib.org/en/stable/docs/software/commandbased/organizing-command-based.html#defining-commands */
 public class SetRPM extends Command {
-  private TunableShooterSubsystem top;
-  private TunableShooterSubsystem bottom;
+  private TunableMotorSubsystem top;
+  private TunableMotorSubsystem bottom;
 
   private double target;
   private NetworkTableEntry targetRPMEntry = NetworkTableInstance.getDefault().getTable("SetRPM").getEntry("Target");
   /** Creates a new SetRPM. */
-  public SetRPM(TunableShooterSubsystem topSubsystem, TunableShooterSubsystem bottomSubsystem) {
+  public SetRPM(TunableMotorSubsystem topSubsystem, TunableMotorSubsystem bottomSubsystem) {
     top = topSubsystem;
     bottom = bottomSubsystem;
     addRequirements(top, bottom);
