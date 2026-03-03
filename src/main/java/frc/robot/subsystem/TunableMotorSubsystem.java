@@ -11,6 +11,8 @@ import com.revrobotics.RelativeEncoder;
 import com.revrobotics.ResetMode;
 import com.revrobotics.sim.SparkFlexSim;
 import com.revrobotics.spark.SparkFlex;
+import com.revrobotics.spark.SparkSim;
+import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkFlexConfig;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
@@ -32,8 +34,10 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 
+import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkBase.ControlType;
+import com.revrobotics.spark.SparkLowLevel.MotorType;
 
 /**
  * Tunable shooter subsystem built for tuning velocity control.
@@ -47,10 +51,10 @@ import com.revrobotics.spark.SparkBase.ControlType;
  */
 public class TunableMotorSubsystem extends SubsystemBase {
   private String name = "TunableShooter";
-  private final SparkFlex leader;
-  private SparkFlex follower;
+  private final SparkBase leader;
+  private SparkBase follower;
   private final RelativeEncoder encoder;
-  private final SparkFlexConfig config = new SparkFlexConfig();
+  private final SparkBaseConfig config = createConfig();
 
   private final SysIdRoutine sysIdRoutine;
 
@@ -94,7 +98,7 @@ public class TunableMotorSubsystem extends SubsystemBase {
   );
 
   // Links the WPILib physics to the REV motor behavior
-  private final SparkFlexSim motorSim;
+  private final SparkSim motorSim;
 
   /**
    * Create a tunable shooter with a leader and an inverted follower.
@@ -108,7 +112,7 @@ public class TunableMotorSubsystem extends SubsystemBase {
 
     this.invertFollower = invertedFollower;
 
-    follower = new SparkFlex(followerId, SparkFlex.MotorType.kBrushless);
+    follower = createMotor(followerId);
  
     // Apply the same base settings to the follower first
     follower.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
@@ -130,11 +134,11 @@ public class TunableMotorSubsystem extends SubsystemBase {
 
   public TunableMotorSubsystem(int leaderId, double kV, double kA, double kS, double p, double i, double d, String name, boolean inverted) {
     this.name = name;
-    leader = new SparkFlex(leaderId, SparkFlex.MotorType.kBrushless);
+    leader = createMotor(leaderId);
     encoder = leader.getEncoder();
 
     // reasonable defaults copied from other motor tests in the project
-    config.smartCurrentLimit(80, 50);
+    config.smartCurrentLimit(100, 50);
     config.idleMode(IdleMode.kCoast);
     config.voltageCompensation(10.0);
     config.inverted(inverted);
@@ -173,7 +177,7 @@ public class TunableMotorSubsystem extends SubsystemBase {
                 log.motor(name)
                     .voltage(
                         m_appliedVoltage.mut_replace(
-                            leader.get() * leader.getBusVoltage(), Volts))
+                            leader.getAppliedOutput() *10.0, Volts))
                     .angularPosition(m_angle.mut_replace(encoder.getPosition(), Rotations))
                     .angularVelocity(
                         m_velocity.mut_replace(encoder.getVelocity(), RotationsPerSecond));
@@ -181,12 +185,24 @@ public class TunableMotorSubsystem extends SubsystemBase {
         this
       ));
 
-    motorSim = new SparkFlexSim(leader, DCMotor.getNeoVortex(1));
+    motorSim = createSim(leader);
   }
 
   public String getName() {
     return name;
   } 
+
+  protected SparkBase createMotor(int deviceId) {
+    return new SparkFlex(deviceId, MotorType.kBrushless);
+  }
+
+  protected SparkBaseConfig createConfig() {
+    return new SparkFlexConfig();
+  }
+
+  protected SparkSim createSim(SparkBase motor) {
+    return new SparkSim(motor, DCMotor.getNeoVortex(1));
+  }
 
   /** Enable closed-loop control. */
   public void enable() {
