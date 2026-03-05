@@ -30,6 +30,7 @@ public class JoystickRPMDrive extends Command {
   // Called when the command is initially scheduled.
   @Override
   public void initialize() {
+    targetRPM = 2459;
     subsystem.setDirectOutput(0);
     subsystem.setTargetRPM(targetRPM);
     subsystem.enable();
@@ -41,12 +42,12 @@ public class JoystickRPMDrive extends Command {
   @Override
   public void execute() {
     // subsystem.setTargetRPM(6000 * controller.getLeftY());
-    if (controller.DDown().getAsBoolean() && waitTime.advanceIfElapsed(2)) {
-      targetRPM -= 100;
+    if (controller.DDown().getAsBoolean() && waitTime.advanceIfElapsed(1)) {
+      targetRPM -= 25;
       subsystem.setTargetRPM(targetRPM);
       SmartDashboard.putNumber(subName + "/TargetRPM", targetRPM);
-    } else if (controller.DUp().getAsBoolean() && waitTime.advanceIfElapsed(2)) {
-      targetRPM += 100;
+    } else if (controller.DUp().getAsBoolean() && waitTime.advanceIfElapsed(1)) {
+      targetRPM += 25;
       subsystem.setTargetRPM(targetRPM);
       SmartDashboard.putNumber(subName + "/TargetRPM", targetRPM);
     }

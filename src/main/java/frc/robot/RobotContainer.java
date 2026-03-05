@@ -74,13 +74,15 @@ public class RobotContainer {
       new JoystickRPMDrive(tunableSubsystems.get("Bottom Tunable"), driverController), 
       new JoystickRPMDrive(tunableSubsystems.get("Middle Tunable"), driverController))
     );
+    
     driverController.Y().toggleOnTrue(
       new JoystickDirectDrive(tunableSubsystems.get("Indexer Tunable"), () -> driverController.getLeftY())
     );
     driverController.RB().toggleOnTrue(
       new JoystickDirectDrive(tunableSubsystems.get("Intake Tunable"), () -> driverController.getLeftX())
     );
-
+    driverController.RT().toggleOnTrue(Commands.run(() -> tunableSubsystems.get("Indexer Tunable").setTargetRPM(4000), tunableSubsystems.get("Indexer Tunable")));
+    //2700rpm 4m, glo photo 1 new,  
     SmartDashboard.putData("Auto Mode", autoChooser);
     SmartDashboard.putData("Live Tune Subsystem", liveTuneChooser);
   }
